@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <!-- <script src="jquery-1.12.4.min.js" type="text/javascript"></script> -->
+  <script src="https://unpkg.com/aptos@latest/dist/index.global.js" type="text/javascript"></script>
+  <script src="index.js" type="text/javascript"></script>
+
+  <head>
+  </head>
+  <style type="text/css">
+    button, textarea{
+      font-size: 25px;
+    }
+  </style>
+  <body>
+    <button id = "connect_wallet" onclick="ConnectWallet()"> Connect Wallet </button>
+    <br/>
+    Wallet Balance: <span id ="wallet_apt_amount">0</span> APT
+    <br/>
+    <p>input like (address, amount) ex; 0xc29e4ea7972150a5f3bd6531eba94907ce2be3b47eb17eaee40d381d2fd9122c, 1</p>
+    <textarea id = "text_area" rows="15" cols="90"></textarea>
+
+  </body>
+  <script>
+      const AptosDecimalNUM = 100_000_000;
+      const aptosClient = new window.aptosSDK.AptosClient("https://fullnode.devnet.aptoslabs.com");
+      function ConnectWallet() {
+        jsConnectWallet().then(async (v) => {
+          let content = "Connect Wallet";
+          if (v) {
+            content = window.martian.address;
+            try {
+              const resource = await aptosClient.getAccountResource(window.martian.address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
+              console.log(resource.data["coin"]["value"] / AptosDecimalNUM);  
+              const aptValue = resource.data["coin"]["value"] / AptosDecimalNUM;
+              document.getElementById('wallet_apt_amount').innerHTML = aptValue;
+            } catch {
+              document.getElementById('wallet_apt_amount').innerHTML = 0;
+            }
+          }
+          document.getElementById('connect_wallet').innerHTML = content;
+        });
+      }
+  </script>
+    
+</html>
