@@ -1,4 +1,4 @@
-let _provider = null;
+
 let connected_state = false;
 
 const getProvider = () => {
@@ -11,7 +11,7 @@ const getProvider = () => {
 };
 
 async function connect_wallet() {
-	_provider = getProvider();
+	let _provider = getProvider();
 
 	if (!_provider) return;
 

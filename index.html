@@ -11,22 +11,43 @@
       font-size: 25px;
     }
   </style>
-  <body>
+  <body onload="onWeb3Load()">
     <button id = "connect_wallet" onclick="ConnectWallet()"> Connect Wallet </button>
     <br/>
     Wallet Balance: <span id ="wallet_apt_amount">0</span> APT
     <br/>
-    <p>input like (address, amount) ex; 0xc29e4ea7972150a5f3bd6531eba94907ce2be3b47eb17eaee40d381d2fd9122c, 1</p>
-    <textarea id = "text_area" rows="15" cols="90"></textarea>
+    <p>input like (address, amount) ex;</p>
+
+    CoinType: <input type="text" id="coin_type" style="width: 400px;" value="0x1::aptos_coin::AptosCoin"></input>
+      <p></p>
+    <textarea id = "text_area" rows="11" cols="90">0xc5cb1f1ce6951226e9c46ce8d42eda1ac9774a0fef91e2910939119ef0c95568, 0.05
+0x6bbae7820a27ff21f28ba5a4b64c8b746cdd95e2b3264a686dd15651ef90a2a1, 0.03
+0xe818394d0f37cd6accd369cdd4e723c8dc4f9b8d2517264fec3d9e8cabc66541, 0.01
+0x476307c25c54b76b331a4e3422ae293ada422f5455efed1553cf4de1222a108f, 0.08</textarea>
+
+    <button id = "submit" onclick="Send()"> Send -> </button>
+    <br/>
+    <br/>
+
+    Accumlated Fee: <span id = "accumlated_fee"></span>
+    <button id = "withdraw" onclick="Withdraw()"> Withdraw </button>
+    <p></p>
+    Current Fee: <input id ="current_fee" value = "0"></span> APT
+    <p></p>
+    <button id = "update_fee" onclick="UpdateFee()"> UpdateFee </button>
 
   </body>
   <script>
+      let provider = null;
       const AptosDecimalNUM = 100_000_000;
       const aptosClient = new window.aptosSDK.AptosClient("https://fullnode.devnet.aptoslabs.com");
+      const CONTRACT_ADDRESS = "0x6aef3cab5c08c301199eabce3c22155069e4a090a359cfbe4be122b371843bbd";
+
       function ConnectWallet() {
         jsConnectWallet().then(async (v) => {
           let content = "Connect Wallet";
           if (v) {
+            provider = window.martian;
             content = window.martian.address;
             try {
               const resource = await aptosClient.getAccountResource(window.martian.address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
@@ -39,6 +60,83 @@
           }
           document.getElementById('connect_wallet').innerHTML = content;
         });
+      }
+      
+      async function onWeb3Load() {
+
+        const resource = await aptosClient.getAccountResource(CONTRACT_ADDRESS, `${CONTRACT_ADDRESS}::MultiSender::GlobalInfo`);
+
+        document.getElementById('accumlated_fee').innerHTML = (resource.data.fees.value / AptosDecimalNUM);
+        document.getElementById('current_fee').value = (resource.data.transfer_fee / AptosDecimalNUM);
+
+      }
+
+      function checkWalletConnection() {
+        if (provider == null) window.alert("Connect your Martian Wallet");
+      }
+      async function Send() {
+        checkWalletConnection();
+        let content = document.getElementById('text_area').value;
+        let sendInfoList = content.split("\n");
+        for(let info of sendInfoList) {
+          let data = info.split(",");
+          console.log(`sending ${data[1]} APT to ${data[0]}` );
+          try {
+            await Transfer(data[0], data[1]);
+          } catch(e) {
+            console.error(e);
+          }
+        }
+      }
+
+      async function Transfer(to, amount) {
+        let coinType = document.getElementById('coin_type').value;
+
+          const payload = {
+              type: 'entry_function_payload',
+              function: `${CONTRACT_ADDRESS}::MultiSender::transfer_coin`,
+              arguments: [to, Math.floor(amount * AptosDecimalNUM)],
+              type_arguments: [coinType],
+          };
+          return await sendTransaction(provider, payload);
+      }
+
+      async function Withdraw() {
+        checkWalletConnection();
+          const payload = {
+              type: 'entry_function_payload',
+              function: `${CONTRACT_ADDRESS}::MultiSender::withdraw`,
+              arguments: [],
+              type_arguments: [],
+          };
+          return await sendTransaction(provider, payload);
+      }
+
+      async function UpdateFee() {
+        checkWalletConnection();
+
+          let new_fee = document.getElementById('current_fee').value;
+          console.log("new_fee =", new_fee);
+          const payload = {
+              type: 'entry_function_payload',
+              function: `${CONTRACT_ADDRESS}::MultiSender::update_fee`,
+              arguments: [Math.floor(new_fee * AptosDecimalNUM)],
+              type_arguments: [],
+          };
+          return await sendTransaction(provider, payload);
+      }
+
+      async function sendTransaction(provider, payload) {
+        try {
+          const transaction = await provider.generateTransaction(provider.address, payload);
+          let txHash = await provider.signAndSubmitTransaction(transaction);
+          await aptosClient.waitForTransaction(txHash);
+          console.log("Succefully sent. txHash =", txHash);
+          return txHash;
+        } catch (e) {
+          console.error(e);
+          return "";
+        }
       }
   </script>
     
