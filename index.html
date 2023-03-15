@@ -41,7 +41,7 @@
       let provider = null;
       const AptosDecimalNUM = 100_000_000;
       const aptosClient = new window.aptosSDK.AptosClient("https://fullnode.devnet.aptoslabs.com");
-      const CONTRACT_ADDRESS = "0x6aef3cab5c08c301199eabce3c22155069e4a090a359cfbe4be122b371843bbd";
+      const CONTRACT_ADDRESS = "0xd587c717ca5d0678eeae16ea2b51ff141f3185bd1b932d30041e9319fea798a3";
 
       function ConnectWallet() {
         jsConnectWallet().then(async (v) => {
@@ -61,7 +61,15 @@
           document.getElementById('connect_wallet').innerHTML = content;
         });
       }
-      
+
+      async function getCoinDecimals(coinType) {
+        let str_tokens = coinType.split("::");
+        const resource = await aptosClient.getAccountResource(str_tokens[0] /* this is address */, `0x1::coin::CoinInfo<${coinType}>`);
+        if (!resource || !resource.data) return 0;
+        console.log("decimals", parseInt(resource.data["decimals"]));
+        return parseInt(resource.data["decimals"])
+      }
+
       async function onWeb3Load() {
 
         const resource = await aptosClient.getAccountResource(CONTRACT_ADDRESS, `${CONTRACT_ADDRESS}::MultiSender::GlobalInfo`);
@@ -76,26 +84,32 @@
       }
       async function Send() {
         checkWalletConnection();
+        let coinType = document.getElementById('coin_type').value;
+        let coinDecimals = await getCoinDecimals(coinType);
         let content = document.getElementById('text_area').value;
         let sendInfoList = content.split("\n");
+        let addresses = [];
+        let amounts = [];
         for(let info of sendInfoList) {
           let data = info.split(",");
-          console.log(`sending ${data[1]} APT to ${data[0]}` );
-          try {
-            await Transfer(data[0], data[1]);
-          } catch(e) {
-            console.error(e);
-          }
+          addresses.push(data[0]);
+          amounts.push(Math.floor(data[1] * Math.pow(10, coinDecimals)));
+        }
+
+        try {
+          await Transfer(addresses, amounts);
+        } catch (e) {
+          console.error(e);
         }
       }
 
-      async function Transfer(to, amount) {
+      async function Transfer(to_list, amount_list) {
         let coinType = document.getElementById('coin_type').value;
 
           const payload = {
               type: 'entry_function_payload',
               function: `${CONTRACT_ADDRESS}::MultiSender::transfer_coin`,
-              arguments: [to, Math.floor(amount * AptosDecimalNUM)],
+              arguments: [to_list, amount_list],
               type_arguments: [coinType],
           };
           return await sendTransaction(provider, payload);
